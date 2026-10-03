@@ -530,6 +530,32 @@ def detect_summary_sheet(prompt):
 
     return False
 
+def write_excel_output(output_file, df, summary_df=None):
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Cleaned Data")
+        _style_worksheet(writer.sheets["Cleaned Data"], df)
+
+        if summary_df is not None:
+            summary_df.to_excel(writer, index=False, sheet_name="Summary")
+            _style_worksheet(writer.sheets["Summary"], summary_df)
+
+
+def _style_worksheet(worksheet, df):
+    from openpyxl.styles import Font, PatternFill
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+
+    for cell in worksheet[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    for i, column in enumerate(df.columns, start=1):
+        max_length = max(
+            [len(str(column))] + [len(str(value)) for value in df[column].astype(str)]
+        )
+        column_letter = worksheet.cell(row=1, column=i).column_letter
+        worksheet.column_dimensions[column_letter].width = min(max_length + 4, 50)
 
 def apply_summary_sheet(df):
     summary_rows = []
@@ -1087,8 +1113,9 @@ async def ai_clean_excel(
     if calc_column:
         df = apply_calculated_column(df, calc_column)
 
+    summary_df = None
     if create_summary:
-        df = apply_summary_sheet(df)
+        summary_df = apply_summary_sheet(df)
 
     # AFTER cleaning information
     after_rows = len(df)
@@ -1158,7 +1185,7 @@ async def ai_clean_excel(
         )
     )
 
-    if extension == ".csv":
+    if extension == ".csv" and summary_df is None:
         df.to_csv(output_file, index=False)
 
         return FileResponse(
@@ -1167,16 +1194,21 @@ async def ai_clean_excel(
             filename="cleaned_" + file.filename
         )
     else:
-        df.to_excel(
-            output_file,
-            index=False,
-            engine="openpyxl"
+        # CSV files that requested a summary sheet are upgraded to .xlsx,
+        # since CSV cannot hold more than one sheet.
+        base_name = os.path.splitext(file.filename)[0]
+        output_filename = f"cleaned_{base_name}.xlsx"
+
+        output_file = os.path.abspath(
+            os.path.join(output_folder, output_filename)
         )
+
+        write_excel_output(output_file, df, summary_df)
 
         return FileResponse(
             path=output_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename="cleaned_" + file.filename
+            filename=output_filename
         )
 
 

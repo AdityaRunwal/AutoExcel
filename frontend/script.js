@@ -442,7 +442,11 @@ async function handleApplyPlan() {
         // Only reached when the response was NOT JSON — safe to read as blob exactly once
         const blob = await response.blob();
 
-        const cleanedFileName = `cleaned_${selectedFile.name}`;
+        // Use the actual filename the server sent back (it may differ from the
+        // original upload, e.g. a CSV upgraded to .xlsx when a summary sheet was requested)
+        const disposition = response.headers.get('content-disposition') || '';
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+        const cleanedFileName = filenameMatch ? filenameMatch[1] : `cleaned_${selectedFile.name}`;
 
         const downloadUrl = window.URL.createObjectURL(blob);
 
