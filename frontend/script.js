@@ -480,6 +480,63 @@ async function handleApplyPlan() {
     }
 }
 
+// Fetch and Render Cleaning Summary
+async function fetchSummary() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/summary`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch summary: ${response.statusText}`);
+        }
+        const data = await response.json();
+        renderSummary(data);
+        summaryContainer.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error fetching cleaning summary:', error);
+    }
+}
+
+// Render the Cleaning Summary section
+function renderSummary(data) {
+    const before = data.before || {};
+    const after = data.after || {};
+    const changes = data.changes || {};
+    const operations = data.operations || [];
+    const validation = data.validation || null;
+
+    beforeRows.textContent = before.rows ?? '—';
+    beforeColumns.textContent = before.columns ?? '—';
+    beforeMissing.textContent = before.missing_values ?? '—';
+    beforeDuplicates.textContent = before.duplicate_rows ?? '—';
+
+    afterRows.textContent = after.rows ?? '—';
+    afterColumns.textContent = after.columns ?? '—';
+    afterMissing.textContent = after.missing_values ?? '—';
+    afterDuplicates.textContent = after.duplicate_rows ?? '—';
+
+    rowsRemoved.textContent = changes.rows_removed ?? '—';
+    columnsRemoved.textContent = changes.columns_removed ?? '—';
+    missingChanged.textContent = changes.missing_values_changed ?? '—';
+    duplicatesRemoved.textContent = changes.duplicates_removed ?? '—';
+
+    operationsList.innerHTML = operations.length > 0
+        ? operations.map(op => `<span>${escapeHtml(formatOperationName(op))}</span>`).join(', ')
+        : '<p>No operations detected.</p>';
+
+    if (validation && validation.status === 'warning' && validation.warnings && validation.warnings.length > 0) {
+        summaryStatus.textContent = '⚠ Cleaning completed with warnings';
+        summaryStatus.className = 'summary-status summary-status-warning';
+
+        const warningHtml = '<div class="summary-warning-box"><strong>Validation Warnings</strong><ul>' +
+            validation.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('') +
+            '</ul></div>';
+
+        operationsList.innerHTML += warningHtml;
+    } else {
+        summaryStatus.textContent = '✓ Cleaning completed successfully';
+        summaryStatus.className = 'summary-status';
+    }
+}
+
 // Fetch Cleaning History
 async function fetchHistory() {
     console.log('fetchHistory called');
