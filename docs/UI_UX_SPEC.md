@@ -23,262 +23,73 @@ For example:
 - "Cleaned File" instead of "Cleaned Excel"
 - "Download Cleaned File" instead of "Download Cleaned Excel"
 
----
+## 2. Actual Interface Structure (Single-Page App)
 
-# 2. Main User Flow
+AutoExcel V1 is implemented as a single HTML page (frontend/index.html) with sections that show and hide dynamically, not a sequence of separate screens. There is no "Continue" button or screen-to-screen navigation.
 
-Home
+The page sections, in order, are:
 
-↓
+1. Header (logo + subtitle)
+2. Cleaner Card - file upload dropzone + cleaning instructions textarea + "Clean Dataset" button
+3. Status Message (shown/hidden as needed)
+4. Download Area (hidden until a file is cleaned)
+5. AI Cleaning Plan section (hidden until a plan is built)
+6. Dataset Information section (hidden until a file is uploaded and analyzed)
+7. Cleaning Summary section (hidden until a cleaning operation completes)
+8. Cleaning History section (always visible, loads on page load)
 
-Upload Dataset
+### Actual User Flow
 
-↓
+Upload Dataset (dropzone)
+        -> Dataset automatically analyzed (POST /upload) - Dataset Information section appears
+        -> Enter Prompt
+        -> Click "Clean Dataset" - this calls POST /preview-plan (not /ai-clean directly)
+        -> AI Cleaning Plan section appears with numbered steps + any skipped steps
+        -> User clicks "Apply Plan" or "Cancel"
+        -> If Apply Plan: POST /ai-clean executes the plan
+        -> Cleaning Summary section appears + Download Area appears
+        -> Cleaning History refreshes automatically
 
-Analyze Dataset
+If no plan could be built (nothing detected, everything skipped, empty prompt, or empty file), the Status Message area shows a clarification message instead of the plan section.
 
-↓
-
-Enter Prompt
-
-↓
-
-Generate Plan
-
-↓
-
-Review Plan
-
-↓
-
-Apply Plan
-
-↓
-
-Processing
-
-↓
-
-Results
-
-↓
-
-Download Cleaned File
-
----
-
-# 3. Screen 1 — Home / Upload
+## 3. Cleaner Card (Upload + Prompt)
 
 Purpose:
 
-Allow the user to upload a spreadsheet dataset and start a cleaning task.
+Let the user upload a dataset and describe what they want cleaned, in one combined card.
 
 Components:
 
-- AutoExcel logo
-- Short product description
-- Upload area
-- Browse button
-- Supported file types
+- Dropzone (click to browse, or drag and drop)
+- Supported file types hint: ".xlsx, .xls, .csv"
+- Selected file name + size, with a "Remove" option
+- Cleaning instructions textarea
+- "Clean Dataset" submit button (disabled until both a file is selected and the prompt is non-empty)
 
 Example:
 
-AutoExcel
+Clean Your Dataset
 
-AI-powered spreadsheet data cleaning
+Upload a dataset and enter prompt instructions to automatically
+clean and structure your data.
 
-"Upload your dataset and tell AutoExcel what you want."
+[ Drag and drop your dataset here, or click to browse ]
+Supports .xlsx, .xls, .csv
 
-[ Drop your dataset here ]
-
-[ Browse ]
-
-Supported:
-
-.xlsx, .xls, .csv
-
----
-
-# 4. Screen 2 — Dataset Analysis
-
-Purpose:
-
-Show the user that AutoExcel has successfully analyzed the uploaded dataset.
-
-Display:
-
-- File name
-- Number of rows
-- Number of columns
-- Missing values
-- Duplicate rows
-- Empty rows
-- Empty columns
-- Data preview
-
-Example:
-
-sales.csv
-
-Rows: 10,542
-
-Columns: 12
-
-Duplicates: 42
-
-Missing Values: 25
-
-Empty Rows: 0
-
-Empty Columns: 0
-
-### Dataset Preview
-
-Display the first 10 rows of the uploaded dataset.
-
-[ Continue ]
-
----
-
-# 5. Screen 3 — Prompt / Workspace
-
-Purpose:
-
-Allow the user to tell AutoExcel what to do.
-
-Components:
-
-- Dataset information
-- Data preview
-- Large prompt input
-- Cleaning instructions
-- Clean Dataset button
-
-Example:
-
-"What would you like AutoExcel to do?"
-
-[ Remove duplicate rows and fill missing values with mean... ]
+Cleaning instructions
+[ Remove duplicate rows, remove extra spaces, and fill missing values with mean ]
 
 [ Clean Dataset ]
 
-The interface should use the same terminology for Excel and CSV files.
+Uploading a file immediately triggers dataset analysis (POST /upload) - there is no separate "analyze" step the user must trigger.
 
----
-
-# 6. Screen 4 — AI Plan
+## 4. Dataset Information Section
 
 Purpose:
 
-Show what AutoExcel intends to do before execution.
-
-Example:
-
-AI Plan
-
-1. Remove duplicates
-
-   Sheet: Customers
-
-   Column: customer_id
-
-2. Handle missing values
-
-   Column: age
-
-   Method: median
-
-3. Create summary
-
-   Group by: region
-
-   Calculation: total sales
-
-[ Apply Plan ]
-
-[ Cancel ]
-
-The AI plan must only contain supported operations.
-
----
-
-# 7. Screen 5 — Processing
-
-Display simple progress:
-
-Analyzing
-
-✓
-
-Planning
-
-✓
-
-Processing
-
-●
-
-Validating
-
-○
-
-The interface should clearly communicate that processing is in progress.
-
-Example loading messages:
-
-"Analyzing dataset..."
-
-"Creating cleaning plan..."
-
-"Processing dataset..."
-
-"Validating result..."
-
----
-
-# 8. Screen 6 — Results
+Show the user that AutoExcel has successfully analyzed the uploaded dataset, before any cleaning happens.
 
 Display:
-
-Cleaning Complete
-
-Rows:
-
-10,542 → 10,500
-
-Duplicates:
-
-42 → 0
-
-Missing Values:
-
-25 → 0
-
-Operations completed:
-
-- Remove duplicates
-- Handle missing values
-- Create summary
-
-Validation:
-
-✓ Passed
-
-Buttons:
-
-[ Download Cleaned File ]
-
-[ View Report ]
-
-The download button must use a common name that works for both Excel and CSV files.
-
----
-
-# 9. Dataset Information
-
-After a file is uploaded successfully, display a dataset information section.
-
-The section should show:
 
 - Rows
 - Columns
@@ -286,116 +97,141 @@ The section should show:
 - Duplicate Rows
 - Empty Rows
 - Empty Columns
+- Dataset Preview (first 10 rows)
 
-A dataset preview should display up to 10 rows.
+This section appears automatically right after upload completes, and stays visible while the user writes their prompt.
 
-The preview should work for:
+Missing values in the preview must be safely displayed without causing frontend or backend serialization errors (values are converted to empty strings rather than null/NaN).
 
-- .xlsx
-- .xls
-- .csv
+## 5. AI Cleaning Plan Section
 
-Missing values in the preview must be safely displayed without causing frontend or backend serialization errors.
+Purpose:
 
----
-
-# 10. Download Area
-
-The download section should use file-type-independent wording.
-
-Use:
-
-"Your file has been cleaned successfully."
+Show what AutoExcel intends to do before any changes are made, and let the user approve or cancel.
 
 Example:
 
-cleaned_sales.csv
+AI Cleaning Plan
 
+Review the steps AutoExcel will perform before applying them.
+
+1. Remove duplicate rows
+2. Fill missing values using median
+3. Sort by Salary (descending)
+
+Skipped Steps
+- rename_columns: Column 'Custmer Name' not found
+
+[ Apply Plan ]   [ Cancel ]
+
+There is no "Sheet:" field shown anywhere - AutoExcel V1 operates on a single dataset per upload, not a multi-sheet workbook.
+
+If the plan is empty (nothing detected or everything skipped), this section does not appear. Instead, the Status Message area shows the clarification text returned by the backend, e.g.:
+
+I couldn't understand any specific cleaning operation in that prompt.
+Try being more specific, e.g. 'remove duplicates', 'fill missing values
+with mean', or 'sort by Salary descending'.
+
+Clicking "Apply Plan" executes the plan (POST /ai-clean). Clicking "Cancel" simply hides this section with no backend call.
+
+## 6. Processing / Loading State
+
+There is no multi-step progress indicator (no "Analyzing / Planning / Processing / Validating" checklist UI). Instead, the single "Clean Dataset" / "Apply Plan" button shows a spinner and disables itself while its respective request is in flight.
+
+Button text during the two stages:
+
+- While building the plan: spinner shown, button disabled
+- While applying the plan: spinner shown, button text "Cleaning..."
+
+## 7. Cleaning Summary Section
+
+Purpose:
+
+Show the before/after results once a plan has been applied successfully.
+
+Display:
+
+Cleaning completed successfully
+
+Before Cleaning          After Cleaning           Changes Made
+Rows: 10,542             Rows: 10,500             Rows Removed: 42
+Columns: 12              Columns: 12              Columns Removed: 0
+Missing Values: 25       Missing Values: 0        Missing Values Changed: 25
+Duplicate Rows: 42       Duplicate Rows: 0        Duplicates Removed: 42
+
+Operations Applied
+remove_duplicates, fill_missing_mean
+
+If the result validation step flags a warning (an expected change didn't happen, or steps were skipped), this should be shown here as well - this is not yet wired into the current frontend markup and should be added as a follow-up UI task (see Section 14).
+
+There is no separate "View Report" button in the current implementation - only "Download Cleaned File."
+
+## 8. Download Area
+
+Purpose:
+
+Let the user download the cleaned file once cleaning succeeds.
+
+The download section should use file-type-independent wording.
+
+Example:
+
+Your file has been cleaned successfully
+cleaned_sales.csv
 [ Download Cleaned File ]
 
 For Excel:
 
+Your file has been cleaned successfully
 cleaned_sales.xlsx
-
 [ Download Cleaned File ]
 
-The UI must not permanently display:
+The UI must not permanently display "Download Cleaned Excel" or "Clean Excel" when the uploaded file is a CSV.
 
-- Download Cleaned Excel
-- Clean Excel
+## 9. Cleaning History Section
 
-when the uploaded file is a CSV.
+Purpose:
 
----
+Show previously completed cleaning operations, stored in PostgreSQL.
 
-# 11. Cleaning History
-
-The application should display a cleaning history section.
-
-The history should include:
+Display, in a table:
 
 - Filename
 - Prompt
-- Operations
-- Status
+- Operations (formatted into readable names, e.g. "Remove Duplicate Rows" instead of the raw remove_duplicates string)
+- Status (shown as a colored status pill)
 - Date
+
+This section is always visible (not hidden), loads automatically on page load, and includes a "Refresh History" button for manually reloading it. History also refreshes automatically right after a successful cleaning operation.
 
 Example:
 
-| Filename | Prompt | Operations | Status | Date |
-|----------|--------|------------|--------|------|
-| sales.csv | Remove duplicates | remove_duplicates | completed | 2026-09-25 |
-| customers.xlsx | Fill missing values | handle_missing_values | completed | 2026-09-25 |
+Cleaning History                              [ Refresh History ]
 
-The history should support both Excel and CSV files.
+Filename         Prompt                  Operations            Status      Date
+sales.csv        Remove duplicates       Remove Duplicate Rows Completed   2026-09-25
+customers.xlsx   Fill missing values     Fill Missing Values   Completed   2026-09-25
+                                          with Mean
 
----
+## 10. Error States
 
-# 12. Loading States
-
-Every operation that takes time should show a loading state.
+Errors are shown in the shared Status Message area (not a separate error screen).
 
 Examples:
 
-"Analyzing dataset..."
-
-"Creating cleaning plan..."
-
-"Processing dataset..."
-
-"Validating result..."
-
-The Clean Dataset button should indicate when processing is active.
-
----
-
-# 13. Error States
-
-Errors should be simple and understandable.
-
-Example:
-
-"AutoExcel could not analyze this dataset."
-
-Reason:
-
-"The uploaded dataset contains invalid or unsupported data."
-
-[ Upload Another Dataset ]
-
 For unsupported files:
+Please select a valid dataset file (.xlsx, .xls, .csv).
 
-"Please select a valid dataset file (.xlsx, .xls, .csv)."
+For a prompt that produced no plan:
+I couldn't understand any specific cleaning operation in that prompt. ...
 
-For unsupported cleaning instructions:
+For a backend connection failure:
+Error: Unable to connect to FastAPI backend at http://127.0.0.1:8000.
 
-"No supported cleaning operation was detected."
+For a failed history load (fixed in Phase 7 - was a CORS misconfiguration, not a UI bug):
+Unable to load cleaning history.
 
-The interface should provide examples of supported operations.
-
----
-
-# 14. Responsive Design
+## 11. Responsive Design
 
 The application must work on:
 
@@ -405,35 +241,22 @@ The application must work on:
 
 Desktop is the primary target for V1 because spreadsheet work is usually performed on larger screens.
 
----
-
-# 15. UX Principles
+## 12. UX Principles
 
 1. Keep the user informed.
-
-2. Never hide what the AI plans to do.
-
-3. Make destructive actions reviewable.
-
+2. Never hide what AutoExcel plans to do - always show the plan before applying it.
+3. Make destructive actions reviewable (Apply/Cancel on the plan).
 4. Use clear language.
-
-5. Avoid unnecessary screens.
-
+5. Avoid unnecessary screens - keep everything on one page with sections that appear as needed.
 6. Show actual results.
-
 7. Keep the interface focused on the spreadsheet task.
-
 8. Use terminology that works for both Excel and CSV files.
+9. Clearly distinguish dataset analysis, plan review, and results.
+10. Never claim that cleaning succeeded if the backend operation failed or was skipped.
 
-9. Clearly distinguish analysis, processing, and results.
+## 13. File-Type Independence
 
-10. Never claim that cleaning succeeded if the backend operation failed.
-
----
-
-# 16. File-Type Independence
-
-AutoExcel should treat Excel and CSV as datasets rather than designing the interface around only Excel files.
+AutoExcel treats Excel and CSV as datasets rather than designing the interface around only Excel files.
 
 Supported input files:
 
@@ -441,38 +264,14 @@ Supported input files:
 - .xls
 - .csv
 
-The UI should dynamically display the actual uploaded filename.
+The UI dynamically displays the actual uploaded filename. The same interface works for both formats.
 
-Examples:
+## 14. Known Gaps / Follow-Up UI Work
 
-sales.xlsx
+- The result-validation warning (from validate_result(), Phase 7) is returned by the backend in the cleaning summary but is not yet displayed anywhere in the current frontend markup. A future pass should add a small warning banner to the Cleaning Summary section when validation.status === "warning".
+- There is no dedicated "View Report" feature - if this is wanted in a future version, it would need new backend and frontend work, not just a UI label change.
 
-sales.csv
-
-The same interface should work for both formats.
-
----
-
-# 17. V1 Interface Structure
-
-The current V1 interface should contain:
-
-1. Header
-2. Dataset Upload
-3. Cleaning Instructions
-4. Clean Dataset Button
-5. Status Messages
-6. Download Cleaned File
-7. Dataset Information
-8. Dataset Preview
-9. Cleaning Summary
-10. Cleaning History
-
-The interface should remain simple and should not introduce unnecessary screens if the functionality can be handled within the existing page.
-
----
-
-# 18. Design Principle
+## 15. Design Principle
 
 AutoExcel should follow this principle:
 

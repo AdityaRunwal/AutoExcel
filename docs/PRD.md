@@ -140,6 +140,16 @@ AutoExcel currently supports the following controlled cleaning operations:
 12. Remove Duplicate Columns
 13. Replace Negative Values with Mean
 14. Remove Invalid Rows
+15. Standardize Text (lowercase / uppercase / title case)
+16. Standardize Dates
+17. Filter Rows (equals, contains, greater than, less than)
+18. Sort Data (ascending/descending)
+19. Rename Columns (supports multiple renames per prompt)
+20. Create Calculated Column (safe arithmetic expressions)
+21. Group & Summarize (sum, average, count, min, max)
+22. Create Summary Sheet (column-level statistics)
+
+Operations 15–22 were added as part of the structured AI planning architecture, where the user reviews a generated plan before it is applied (see Section 9, FR-04a and FR-06a).
 
 The operation detector uses supported natural-language phrases to identify the requested operation.
 
@@ -255,6 +265,16 @@ Only supported operations should be detected and executed.
 
 ---
 
+## FR-04a Plan Generation and Review (added)
+
+Before any operation is executed, the backend must build a structured plan from the detected operations and validate it against the uploaded dataset's actual columns.
+
+The frontend must show this plan to the user as a numbered list of steps, along with any steps that were skipped (and why), before anything is changed.
+
+The user must explicitly approve the plan (click "Apply Plan") before execution happens. The user may also cancel the plan without any changes being made.
+
+---
+
 ## FR-05 Operation Execution
 
 The backend must execute the detected operations using controlled data-processing functions.
@@ -265,22 +285,25 @@ The system must not execute arbitrary Python code generated from user input.
 
 ## FR-06 Unsupported Request Handling
 
-If no supported cleaning operation is detected, the system must not modify the dataset.
+If no supported cleaning operation is detected, or if every detected operation fails validation (e.g. referenced columns don't exist), the system must not modify the dataset.
 
-Instead, it should inform the user that no supported operation was detected and provide example supported operations.
+Instead, it should inform the user with a specific clarification message explaining why no plan could be built, and suggest example phrasing.
 
-Example:
+Example (nothing detected):
 
 ```text
-No supported cleaning operation was detected.
-
-Try one of these:
-- Remove duplicate rows
-- Fill missing values with mean
-- Remove empty rows
-- Remove extra spaces
-- Standardize column names
+I couldn't understand any specific cleaning operation in that prompt.
+Try being more specific, e.g. 'remove duplicates', 'fill missing values with mean',
+or 'sort by Salary descending'.
 ```
+
+Example (detected but all skipped):
+
+```text
+None of the requested operations could be applied: Column 'Salry' not found
+```
+
+An empty or whitespace-only prompt, and a file with zero data rows, must also be rejected before any plan is built.
 
 ---
 
@@ -314,6 +337,14 @@ The summary should contain:
 ### Operations Applied
 
 The summary must also display the operations detected and executed.
+
+---
+
+## FR-07a Result Validation (added)
+
+After execution, the system must compare the actual before/after changes against what was requested and flag a warning if an expected change did not occur (for example, "remove duplicates" was requested but the duplicate count did not change).
+
+The validation result (`passed` or `warning`, with a list of warning messages) must be included in the cleaning summary.
 
 ---
 
@@ -520,18 +551,32 @@ It provides information such as:
 
 ---
 
-### POST `/ai-clean`
+### POST `/preview-plan`
 
-Used to process the uploaded dataset according to the natural-language cleaning prompt.
+Used to build and validate a cleaning plan from the natural-language prompt, without applying any changes, so the user can review it first.
 
 The endpoint:
 
 1. Reads the dataset.
-2. Detects supported operations.
+2. Detects supported operations and builds a structured plan.
+3. Validates the plan against the dataset's actual columns.
+4. Returns the readable plan, any skipped steps, and a clarification message if nothing could be planned.
+
+---
+
+### POST `/ai-clean`
+
+Used to execute an approved cleaning plan, after the user reviews it via `/preview-plan` and clicks "Apply Plan."
+
+The endpoint:
+
+1. Reads the dataset.
+2. Re-detects and re-validates the plan.
 3. Applies the operations.
-4. Generates the cleaning summary.
-5. Saves cleaning history.
-6. Returns the cleaned dataset.
+4. Validates the result against expected changes.
+5. Generates the cleaning summary (including validation and any skipped steps).
+6. Saves cleaning history.
+7. Returns the cleaned dataset.
 
 ---
 
@@ -580,7 +625,12 @@ The current version of AutoExcel will be considered successful when:
 - Supported cleaning operations can be detected.
 - Supported operations can be executed.
 - Unsupported operations are rejected safely.
+- A plan is generated and shown to the user for review before any changes are made.
+- The user can approve or cancel a generated plan.
+- Steps referencing non-existent columns are skipped individually, with a clear reason, rather than failing the whole request.
+- A clear clarification message is shown when nothing could be planned (no operation detected, all steps skipped, empty prompt, or empty file).
 - A before/after cleaning summary can be generated.
+- The result is validated against the expected changes, with warnings shown if something didn't happen as requested.
 - Cleaning history can be stored in PostgreSQL.
 - Cleaning history can be displayed.
 - A cleaned dataset can be downloaded.

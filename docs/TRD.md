@@ -317,6 +317,18 @@ The current operation engine supports:
 12. `remove_duplicate_columns`
 13. `replace_negative_with_mean`
 14. `remove_invalid_rows`
+15. `standardize_text_lower`
+16. `standardize_text_upper`
+17. `standardize_text_title`
+18. `standardize_dates`
+19. `filter_rows`
+20. `sort_data`
+21. `rename_columns`
+22. `create_calculated_column`
+23. `group_summarize`
+24. `create_summary_sheet`
+
+Operations 15–24 were added in Phase 6 as part of the structured AI planning architecture (see AI_SCHEMA.md).
 
 These operations are controlled backend operations.
 
@@ -409,9 +421,9 @@ It returns dataset information such as:
 
 ---
 
-## POST `/ai-clean`
+## POST `/preview-plan`
 
-Used to clean a dataset according to a natural-language prompt.
+Used to build and validate a cleaning plan from a natural-language prompt, without applying any changes. This lets the user review what AutoExcel intends to do before anything is executed.
 
 The endpoint accepts:
 
@@ -423,13 +435,33 @@ prompt
 The endpoint:
 
 1. Reads the uploaded file.
-2. Detects supported operations.
-3. Handles unsupported requests.
-4. Applies detected operations.
-5. Generates the cleaning summary.
-6. Saves cleaning history.
-7. Creates the cleaned output file.
-8. Returns the cleaned file.
+2. Rejects empty prompts and empty files before detection runs.
+3. Detects supported operations and builds a structured plan.
+4. Validates the plan against the actual dataset's columns.
+5. Returns the readable plan steps, any skipped steps, and a clarification message if nothing could be planned.
+
+## POST `/ai-clean`
+
+Used to execute an approved cleaning plan and return the cleaned file. Called after the user reviews the plan from `/preview-plan` and clicks "Apply Plan."
+
+The endpoint accepts:
+
+```text
+file
+prompt
+```
+
+The endpoint:
+
+1. Reads the uploaded file.
+2. Rejects empty prompts and empty files.
+3. Re-detects operations and re-validates the plan.
+4. Applies the validated operations.
+5. Validates the result against expected before/after changes.
+6. Generates the cleaning summary (including validation warnings and skipped steps).
+7. Saves cleaning history.
+8. Creates the cleaned output file.
+9. Returns the cleaned file.
 
 ---
 
@@ -519,14 +551,28 @@ Remove duplicate rows, remove extra spaces, and fill missing values with mean.
 The cleaning button should:
 
 - Remain disabled when required input is missing.
-- Show a processing state while cleaning.
-- Send the selected file and prompt to `/ai-clean`.
+- Show a processing state while building the plan.
+- Send the selected file and prompt to `/preview-plan` (not directly to `/ai-clean`).
+
+---
+
+## Plan Review UI
+
+After a plan is successfully built, the frontend should display:
+
+- A numbered list of the steps AutoExcel intends to perform.
+- Any skipped steps, with the reason each was skipped (e.g. a column name that doesn't exist).
+- An "Apply Plan" button and a "Cancel" button.
+
+If no plan could be built (nothing detected, or everything skipped), the frontend should display the clarification message returned by the backend instead of an empty plan.
+
+Clicking "Apply Plan" sends the same file and prompt to `/ai-clean` to actually perform the cleaning. Clicking "Cancel" simply hides the plan without calling the backend again.
 
 ---
 
 ## Cleaning Result
 
-After successful cleaning, the frontend should display:
+After the user applies the plan and cleaning succeeds, the frontend should display:
 
 ```text
 Your file has been cleaned successfully.
@@ -820,10 +866,19 @@ Test:
 
 ```text
 POST /upload
+POST /preview-plan
 POST /ai-clean
 GET /summary
 GET /history
 ```
+
+Plan-specific test cases should include:
+
+- A prompt with no detectable operation (expect `clarification_needed: true`)
+- A prompt whose operations all reference non-existent columns (expect all steps in `skipped_steps`)
+- An empty or whitespace-only prompt
+- A file with zero data rows
+- A normal valid prompt that produces a plan with no skipped steps
 
 ## Integration Testing
 

@@ -2,535 +2,195 @@
 
 ## 1. Purpose
 
-This document defines how the AI understands user requests and converts them into structured operations.
+This document defines how AutoExcel understands user prompts and converts them into structured cleaning operations.
 
-The AI is responsible for planning.
+**Note on implementation:** AutoExcel V1 uses a **rule-based detector system**, not a large language model. The "AI Planner" referenced throughout this document is implemented as a set of Python keyword/phrase detectors in `backend/app/routes/ai_clean.py`. This keeps behavior predictable and fully controlled, with no external AI API calls.
+
+The Planner is responsible for detecting intent and building a plan.
 
 The Python engine is responsible for execution.
 
-The AI must never directly execute Python code.
+The Planner never directly executes pandas/Python operations itself — it only produces a plan dictionary.
 
----
+## 2. Actual Flow (as implemented)
 
-# 2. AI Flow
+User Prompt + Uploaded File
+        -> Read file into a single pandas DataFrame
+        -> build_cleaning_plan(prompt) detects operations via keyword/phrase matching
+        -> Structured Plan (dict with "steps" list)
+        -> validate_plan(df, plan) checks columns exist; invalid steps moved to skipped_steps
+        -> POST /preview-plan returns readable plan + skipped steps, no execution
+        -> User clicks "Apply Plan" (frontend)
+        -> POST /ai-clean re-runs build_cleaning_plan + validate_plan, then executes
+        -> apply_operations() / apply_calculated_column() / apply_summary_sheet()
+        -> validate_result() compares before/after stats, flags warnings
+        -> Cleaning Summary + Cleaned File Download
 
-User Prompt
+There is no multi-sheet workbook concept in V1 — each uploaded file (.xlsx, .xls, .csv) is read into one DataFrame and operations apply to that single dataset.
 
-↓
+## 3. Planner Responsibilities
 
-Workbook Profile
+The Planner (detector functions) should:
 
-↓
+- Parse the prompt using keyword and phrase matching.
+- Identify which of the 12 supported operations apply.
+- Extract operation parameters (column names, methods, values) directly from the prompt text.
+- Return a structured plan dictionary.
+- Flag when no operation was detected (clarification_needed: true).
 
-AI Planner
+The Planner does NOT:
 
-↓
+- Call any external AI/LLM API.
+- Generate or execute arbitrary Python code.
+- Invent operations outside the supported list.
+- Modify the original uploaded file (a new cleaned file is always written separately).
+- Claim an operation succeeded before /ai-clean actually executes it.
 
-Structured JSON Plan
+## 4. Supported Operation Names (actual strings used in code)
 
-↓
+1. remove_duplicates
+2. fill_missing_mean, fill_missing_median, fill_missing_mode (missing-value handling is split into three distinct operations, not one with a method parameter)
+3. remove_extra_spaces
+4. standardize_text_lower, standardize_text_upper, standardize_text_title (standardize-text is similarly split by case)
+5. convert_numeric / data-type change operations
+6. standardize_dates
+7. filter_rows
+8. sort_data
+9. rename_columns
+10. create_calculated_column
+11. group_summarize
+12. create_summary_sheet
 
-Schema Validation
+Additional operations have also been observed in testing (e.g. remove_missing, remove_duplicate_columns, remove_negative_values, replace_negative_with_mean, remove_invalid_rows, standardize_columns). These extend beyond the original V1 list of 12 and should be reconciled with this document in a future pass — see Section 10.
 
-↓
+Any operation not detected by the current set of detector functions is treated as unsupported for that prompt.
 
-Operation Validation
+## 5. Actual Plan Structure
 
-↓
-
-Execution Engine
-
-↓
-
-Result Validation
-
----
-
-# 3. AI Responsibilities
-
-The AI should:
-
-- Understand the user's request.
-- Identify required operations.
-- Select only supported operations.
-- Identify relevant sheets.
-- Identify relevant columns.
-- Generate valid operation parameters.
-- Return structured JSON.
-- Ask for clarification when required information is missing.
-
-The AI should NOT:
-
-- Generate arbitrary Python.
-- Execute code.
-- Invent unsupported operations.
-- Modify the original file.
-- Claim an operation was completed before execution.
-- Use sheet or column names that do not exist in the workbook profile.
-
----
-
-# 4. Supported Operation Names
-
-The AI can only use these 12 operation names:
-
-1. `remove_duplicates`
-2. `handle_missing_values`
-3. `remove_whitespace`
-4. `standardize_text`
-5. `change_data_type`
-6. `standardize_dates`
-7. `filter_rows`
-8. `sort_data`
-9. `rename_columns`
-10. `create_calculated_column`
-11. `group_and_summarize`
-12. `create_summary_sheet`
-
-Any operation outside this list must be rejected as unsupported in V1.
-
----
-
-# 5. Structured Plan
-
-The AI must return a structured JSON plan.
-
-Example:
+The Planner returns a dictionary, not a list of operation objects with a sheet field (there is no sheet concept). Example, for the prompt "remove duplicates and sort by Salary descending":
 
 {
-  "operations": [
-    {
-      "operation": "remove_duplicates",
-      "sheet": "Customers",
-      "parameters": {
-        "columns": ["customer_id"]
-      }
-    }
+  "steps": [
+    { "operation": "remove_duplicates", "params": {} },
+    { "operation": "sort_data", "params": { "column_raw": "Salary", "ascending": false } }
+  ],
+  "operations": ["remove_duplicates"],
+  "filter_condition": null,
+  "sort_condition": { "column_raw": "Salary", "ascending": false },
+  "rename_conditions": [],
+  "calc_column": null,
+  "group_condition": null,
+  "create_summary": false,
+  "clarification_needed": false
+}
+
+After validate_plan(df, plan) runs, two more keys are added:
+
+{
+  "skipped_steps": [
+    { "operation": "sort_data", "reason": "Column 'Salry' not found" }
   ]
 }
 
----
+(plan["steps"] is also filtered down to only the steps that passed validation.)
 
-# 6. Operation Structure
+## 6. Step Structure
 
-Each operation must contain:
+Each step in plan["steps"] contains exactly two keys:
 
-- `operation`
-- `sheet`
-- `parameters`
+- operation — one of the supported operation name strings (Section 4)
+- params — a dictionary of operation-specific parameters, detected directly from prompt text (e.g. raw column names as typed by the user, which are matched case-insensitively against actual DataFrame columns during validation)
 
-Example:
+There is no sheet key — V1 operates on a single DataFrame per request.
 
+## 7. Operation Parameter Notes (as implemented)
+
+### remove_duplicates
+params: {} — no parameters; always removes fully duplicated rows.
+
+### fill_missing_mean / fill_missing_median / fill_missing_mode
+Each is a distinct operation name. There is no single handle_missing_values operation with a method field — the method is encoded directly in the operation name.
+
+### remove_extra_spaces
+params: {} — strips leading/trailing/extra internal whitespace from text columns.
+
+### standardize_text_lower / _upper / _title
+Each case variant is a separate operation name rather than a method parameter.
+
+### filter_rows
+params: { column_raw, operator, value } — supports equals, contains, greater than / is greater than, less than / is less than phrasing.
+
+### sort_data
+params: { column_raw, ascending } — flexible phrasing for ascending/descending.
+
+### rename_columns
+params: { renames: [ { old_name_raw, new_name_raw }, ... ] } — supports multiple renames detected from a single prompt.
+
+### create_calculated_column
+params includes the new column name and a validated arithmetic expression (supports + - * /, parentheses, and natural phrases like "times"/"plus"). The expression is evaluated by a safe expression evaluator — never via Python's eval() on unsanitized input.
+
+### group_summarize
+params: { group_column_raw, agg_column_raw, aggregation } — supports sum, average, count, min, max.
+
+### create_summary_sheet
+params: {} — replaces the current dataset with column-level statistics (count, missing, unique, mean, min, max).
+
+## 8. Planner Rules (as implemented)
+
+### Rule 1 — Supported Operations Only
+Only operations with a matching detector function can appear in a plan. Everything else is simply not detected — there is no separate "reject unsupported operation" path at the planning stage; an unrecognized request just produces zero steps (see Rule 3).
+
+### Rule 2 — Real Column Names Only
+validate_plan() checks every column name referenced in a step against the actual uploaded file's columns (case-insensitive). Steps referencing a non-existent column are moved to skipped_steps with a reason, rather than crashing the whole request.
+
+### Rule 3 — No Operation Detected
+If build_cleaning_plan() finds zero operations in the prompt, it returns:
+{ "steps": [], "clarification_needed": true, "message": "I couldn't understand any specific cleaning operation in that prompt. Try being more specific, e.g. 'remove duplicates', 'fill missing values with mean', or 'sort by Salary descending'." }
+
+### Rule 4 — All Steps Skipped at Validation
+If operations were detected but every one of them failed validation (e.g. all referenced columns don't exist), /preview-plan builds a message from skipped_steps reasons:
+{ "has_plan": false, "clarification_needed": true, "message": "None of the requested operations could be applied: Column 'X' not found" }
+
+### Rule 5 — Empty Prompt
+A blank or whitespace-only prompt is rejected before detection runs, with clarification_needed: true and a message asking the user to enter instructions.
+
+### Rule 6 — Empty File
+A file with zero data rows is rejected with an HTTP 400 error before any plan is built.
+
+### Rule 7 — No Arbitrary Code Execution
+create_calculated_column uses a restricted, safe expression evaluator. No operation anywhere in the system runs arbitrary user-supplied Python or pandas code.
+
+## 9. Example (actual request/response)
+
+User prompt: "Remove duplicate customers and fill missing ages with the median."
+
+POST /preview-plan response:
 {
-  "operation": "sort_data",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "sales",
-    "order": "descending"
-  }
+  "steps": [
+    { "operation": "remove_duplicates", "description": "Remove duplicate rows" },
+    { "operation": "fill_missing_median", "description": "Fill missing values using median" }
+  ],
+  "skipped_steps": [],
+  "has_plan": true,
+  "clarification_needed": false,
+  "message": ""
 }
 
----
+## 10. Known Gaps / Future Reconciliation
 
-# 7. Operation Parameter Rules
+This section exists so the schema stays honest about where documentation and code have diverged:
 
-Each supported operation must use controlled parameters.
+- The original V1 operation list (12 single-named operations) does not match the actual detector set, which splits several operations by variant (missing-value method, text case) and includes additional operations not in the original list (e.g. remove_negative_values, remove_duplicate_columns).
+- There is no "sheet" concept — this entire document previously assumed multi-sheet workbook support, which was never built and is out of scope per the project's stated boundaries.
+- There is no LLM-based "AI Planner" — all detection is deterministic keyword/phrase matching. If a true AI/LLM planning layer is added in a future phase, this document must be revised again to reflect that change, and the current detector-based system should be described as the V1 baseline it replaces.
+- Plan status values (ready/needs_clarification/etc., Section 14 in the previous version of this doc) do not exist in code. The actual signal is the combination of has_plan (bool) and clarification_needed (bool) plus a message string.
 
-## remove_duplicates
+## 11. Separation of Responsibilities (still accurate)
 
-Example:
+Detector Functions (Planner)
+   -> Parse prompt, identify operations and parameters
+        -> validate_plan() (Validator) checks columns exist, filters invalid steps
+        -> apply_operations() / apply_calculated_column() / apply_summary_sheet() (Executor) performs the actual pandas transformations
+        -> validate_result() (Result Validator) compares before/after stats, flags warnings if an expected change didn't occur
 
-{
-  "operation": "remove_duplicates",
-  "sheet": "Customers",
-  "parameters": {
-    "columns": ["customer_id"]
-  }
-}
-
-The `columns` parameter is optional when the user wants to remove completely duplicated rows.
-
----
-
-## handle_missing_values
-
-Example:
-
-{
-  "operation": "handle_missing_values",
-  "sheet": "Customers",
-  "parameters": {
-    "column": "age",
-    "method": "median"
-  }
-}
-
-Supported methods may include:
-
-- `mean`
-- `median`
-- `mode`
-- `remove_rows`
-
----
-
-## remove_whitespace
-
-Example:
-
-{
-  "operation": "remove_whitespace",
-  "sheet": "Customers",
-  "parameters": {
-    "columns": ["name", "city"]
-  }
-}
-
----
-
-## standardize_text
-
-Example:
-
-{
-  "operation": "standardize_text",
-  "sheet": "Customers",
-  "parameters": {
-    "column": "city",
-    "method": "lowercase"
-  }
-}
-
-The exact supported text-standardization methods must be validated by the operation engine.
-
----
-
-## change_data_type
-
-Example:
-
-{
-  "operation": "change_data_type",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "quantity",
-    "data_type": "integer"
-  }
-}
-
----
-
-## standardize_dates
-
-Example:
-
-{
-  "operation": "standardize_dates",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "order_date",
-    "format": "YYYY-MM-DD"
-  }
-}
-
----
-
-## filter_rows
-
-Example:
-
-{
-  "operation": "filter_rows",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "sales",
-    "condition": ">",
-    "value": 1000
-  }
-}
-
----
-
-## sort_data
-
-Example:
-
-{
-  "operation": "sort_data",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "sales",
-    "order": "descending"
-  }
-}
-
-Supported order values:
-
-- `ascending`
-- `descending`
-
----
-
-## rename_columns
-
-Example:
-
-{
-  "operation": "rename_columns",
-  "sheet": "Customers",
-  "parameters": {
-    "mapping": {
-      "Customer Name": "customer_name",
-      "Phone Number": "phone_number"
-    }
-  }
-}
-
----
-
-## create_calculated_column
-
-Example:
-
-{
-  "operation": "create_calculated_column",
-  "sheet": "Sales",
-  "parameters": {
-    "column": "total_sales",
-    "formula": "quantity * price"
-  }
-}
-
-The formula must be validated before execution.
-
-The AI must not generate arbitrary Python code.
-
----
-
-## group_and_summarize
-
-Example:
-
-{
-  "operation": "group_and_summarize",
-  "sheet": "Sales",
-  "parameters": {
-    "group_by": ["region"],
-    "column": "sales",
-    "aggregation": "sum"
-  }
-}
-
----
-
-## create_summary_sheet
-
-Example:
-
-{
-  "operation": "create_summary_sheet",
-  "sheet": "Sales",
-  "parameters": {
-    "group_by": ["region"],
-    "column": "sales",
-    "aggregation": "sum",
-    "output_sheet": "Sales Summary"
-  }
-}
-
----
-
-# 8. AI Rules
-
-## Rule 1 — Supported Operations Only
-
-Only the 12 supported operations can be returned.
-
----
-
-## Rule 2 — Actual Workbook Information
-
-The AI must use the actual sheet names and column names provided by the workbook profile.
-
-The AI must not invent sheet names or columns.
-
----
-
-## Rule 3 — No Guessing
-
-If the request is ambiguous and the required information cannot be determined safely, the AI should request clarification instead of guessing.
-
----
-
-## Rule 4 — Unsupported Operations
-
-If the user requests an operation that is not supported in V1, the AI must return a clear message explaining that the operation is currently unavailable.
-
----
-
-## Rule 5 — Structured Output
-
-The AI must return structured JSON that follows the AutoExcel AI schema.
-
----
-
-## Rule 6 — No Executable Code
-
-The AI must never return executable Python code.
-
-The AI only creates a plan.
-
----
-
-## Rule 7 — Parameter Validation
-
-Parameters must be appropriate for the selected operation.
-
-Invalid parameters must be rejected before execution.
-
----
-
-# 9. Example
-
-User:
-
-"Remove duplicate customers and fill missing ages with the median."
-
-AI output:
-
-{
-  "operations": [
-    {
-      "operation": "remove_duplicates",
-      "sheet": "Customers",
-      "parameters": {
-        "columns": ["customer_id"]
-      }
-    },
-    {
-      "operation": "handle_missing_values",
-      "sheet": "Customers",
-      "parameters": {
-        "column": "age",
-        "method": "median"
-      }
-    }
-  ]
-}
-
----
-
-# 10. Invalid Example
-
-The AI must NOT return:
-
-{
-  "python_code": "df.drop_duplicates()"
-}
-
-The AI must only select supported operations and provide structured parameters.
-
----
-
-# 11. Plan Validation
-
-Before execution, the backend must:
-
-1. Check that the operation name is supported.
-2. Check that the sheet exists.
-3. Check that required columns exist.
-4. Check that parameters are valid.
-5. Check that parameter values are supported.
-6. Reject unsupported operations.
-7. Reject malformed plans.
-
-Only validated plans can reach the execution engine.
-
----
-
-# 12. AI Failure Handling
-
-If the AI cannot safely understand the request, it should return a structured response indicating that clarification is required.
-
-Example:
-
-{
-  "status": "needs_clarification",
-  "message": "Which column should be used to identify duplicate customers?"
-}
-
----
-
-# 13. Unsupported Operation Response
-
-If the user requests an unsupported operation:
-
-Example:
-
-{
-  "status": "unsupported_operation",
-  "message": "This operation is not supported in AutoExcel V1."
-}
-
-The system must not execute the requested operation.
-
----
-
-# 14. Plan Status
-
-The AI plan may have one of the following statuses:
-
-- `ready`
-- `needs_clarification`
-- `unsupported_operation`
-- `invalid_plan`
-
-Only a plan with status `ready` can proceed to execution.
-
----
-
-# 15. AI and Execution Separation
-
-The responsibilities are strictly separated:
-
-AI Planner
-
-→ Understands the request
-
-→ Creates the structured plan
-
-↓
-
-Validator
-
-→ Checks the plan
-
-↓
-
-Python Operation Engine
-
-→ Executes the approved operations
-
-↓
-
-Result Validator
-
-→ Checks the result
-
-The AI does not directly modify the spreadsheet.
-
----
-
-# 16. Important Principle
-
-AI = Planner
-
-Python Engine = Executor
-
-Validator = Safety Layer
-
-Result Validator = Quality Check
-
-The core AutoExcel principle is:
-
-"AI understands the request. Controlled tools perform the work. Validation checks the result."
+The Planner never modifies the DataFrame directly — only the Executor functions do, and only after validation and (via the two-endpoint split) explicit user approval through the Plan Review UI.
