@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoExcel - AI-Powered Data Cleaning</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <a href="#" class="brand-logo">Auto<span class="brand-accent">Excel</span></a>
+                <p class="subtitle">AI-Powered Dataset Cleaning</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Cleaner Card -->
+            <section class="card cleaner-card">
+                <div class="card-title-group">
+                    <h2>Clean Your Dataset</h2>
+                    <p class="card-desc">
+                        Upload a dataset and enter prompt instructions to automatically clean and structure your data.
+                    </p>
+                </div>
+
+                <form id="clean-form" aria-label="Dataset Cleaning Form">
+                    <!-- File Upload Dropzone -->
+                    <div class="form-group">
+                        <label for="file-input" class="form-label">Upload Dataset</label>
+                        <div class="dropzone" id="dropzone" tabindex="0" role="button"
+                            aria-label="Drag and drop your dataset here, or click to browse">
+                            <input type="file" id="file-input" accept=".xlsx, .xls, .csv" required hidden>
+                            <div class="dropzone-content" id="dropzone-prompt">
+                                <p class="dropzone-title">Drag and drop your dataset here, or click to browse</p>
+                                <p class="dropzone-hint">Supports .xlsx, .xls, .csv</p>
+                            </div>
+                            <div class="file-details hidden" id="file-details">
+                                <div class="file-info-text">
+                                    <span id="file-name" class="file-name"></span>
+                                    <span id="file-size" class="file-size"></span>
+                                </div>
+                                <button type="button" id="remove-file-btn" class="btn-text-danger"
+                                    aria-label="Remove file">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Prompt Input -->
+                    <div class="form-group">
+                        <label for="prompt-input" class="form-label">Cleaning instructions</label>
+                        <textarea id="prompt-input" rows="5"
+                            placeholder="Example: Remove duplicate rows, remove extra spaces, and fill missing values with mean"
+                            required></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-group">
+                        <button type="submit" id="submit-btn" class="btn btn-primary" disabled>
+                            <span class="spinner hidden" id="spinner" aria-hidden="true"></span>
+                            <span class="btn-text">Clean Dataset</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Status Messages -->
+                <div id="status-message" class="status-message hidden" aria-live="polite"></div>
+
+                <!-- Download Area -->
+                <div id="download-container" class="download-container hidden">
+                    <div class="result-banner">
+                        <div class="result-info">
+                            <p class="result-title">Your file has been cleaned successfully</p>
+                            <p id="download-filename" class="result-filename">cleaned_file.xlsx</p>
+                        </div>
+                            <a id="download-btn" class="btn btn-primary" download>
+                                Download Cleaned File
+                            </a>    
+                    </div>
+                </div>
+            </section>
+
+            <!-- AI Cleaning Plan -->
+            <section id="plan-container" class="card hidden">
+                <div class="card-title-group">
+                    <h2>AI Cleaning Plan</h2>
+                    <p class="card-desc">
+                        Review the steps AutoExcel will perform before applying them.
+                    </p>
+                </div>
+
+                <div id="plan-steps-list"></div>
+                <div id="plan-skipped-list"></div>
+
+                <div class="form-group">
+                    <button type="button" id="apply-plan-btn" class="btn btn-primary">Apply Plan</button>
+                    <button type="button" id="cancel-plan-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </section>
+
+                        <!-- Dataset Information -->
+            <section id="dataset-container" class="card hidden">
+
+                <div class="card-title-group">
+                    <h2>Dataset Information</h2>
+                    <p class="card-desc">
+                        Overview of the uploaded dataset before cleaning.
+                    </p>
+                </div>
+
+                <div class="dataset-stats">
+
+                    <div class="dataset-stat">
+                        <span>Rows</span>
+                        <strong id="dataset-rows">—</strong>
+                    </div>
+
+                    <div class="dataset-stat">
+                        <span>Columns</span>
+                        <strong id="dataset-columns">—</strong>
+                    </div>
+
+                    <div class="dataset-stat">
+                        <span>Missing Values</span>
+                        <strong id="dataset-missing">—</strong>
+                    </div>
+
+                    <div class="dataset-stat">
+                        <span>Duplicate Rows</span>
+                        <strong id="dataset-duplicates">—</strong>
+                    </div>
+
+                    <div class="dataset-stat">
+                        <span>Empty Rows</span>
+                        <strong id="dataset-empty-rows">—</strong>
+                    </div>
+
+                    <div class="dataset-stat">
+                        <span>Empty Columns</span>
+                        <strong id="dataset-empty-columns">—</strong>
+                    </div>
+
+                </div>
+
+                <div class="dataset-preview-section">
+                    <h3>Dataset Preview</h3>
+                    <p class="card-desc">
+                        First 10 rows of your uploaded dataset.
+                    </p>
+
+                    <div class="table-container">
+                        <table class="history-table" id="dataset-preview-table">
+                            <thead id="dataset-preview-head"></thead>
+                            <tbody id="dataset-preview-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Cleaning Summary -->
+            <section id="summary-container" class="card hidden">
+                <div id="summary-status" class="summary-status">
+                    ✓ Cleaning completed successfully
+                </div>
+                <div class="card-title-group">
+                    <h2>Cleaning Summary</h2>
+                    <p class="card-desc">Overview of the changes made to your dataset.</p>
+                </div>
+
+                <div>
+                    <h3>Before Cleaning</h3>
+                    <div>
+                        <div>
+                            <span>Rows</span>
+                            <span id="before-rows">—</span>
+                        </div>
+                        <div>
+                            <span>Columns</span>
+                            <span id="before-columns">—</span>
+                        </div>
+                        <div>
+                            <span>Missing Values</span>
+                            <span id="before-missing">—</span>
+                        </div>
+                        <div>
+                            <span>Duplicate Rows</span>
+                            <span id="before-duplicates">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3>After Cleaning</h3>
+                    <div>
+                        <div>
+                            <span>Rows</span>
+                            <span id="after-rows">—</span>
+                        </div>
+                        <div>
+                            <span>Columns</span>
+                            <span id="after-columns">—</span>
+                        </div>
+                        <div>
+                            <span>Missing Values</span>
+                            <span id="after-missing">—</span>
+                        </div>
+                        <div>
+                            <span>Duplicate Rows</span>
+                            <span id="after-duplicates">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3>Changes Made</h3>
+                    <div>
+                        <div>
+                            <span>Rows Removed</span>
+                            <span id="rows-removed">—</span>
+                        </div>
+                        <div>
+                            <span>Columns Removed</span>
+                            <span id="columns-removed">—</span>
+                        </div>
+                        <div>
+                            <span>Missing Values Changed</span>
+                            <span id="missing-changed">—</span>
+                        </div>
+                        <div>
+                            <span>Duplicates Removed</span>
+                            <span id="duplicates-removed">—</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-operations">
+                    <h3>Operations Applied</h3>
+                    <div id="operations-list">
+                        <p>No operations detected.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- History Card -->
+            <section class="card history-card">
+                <div class="card-header">
+                    <h2>Cleaning History</h2>
+                    <button id="refresh-history-btn" class="btn btn-secondary btn-sm">
+                        Refresh History
+                    </button>
+                </div>
+
+                <!-- History Table Container -->
+                <div class="table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Prompt</th>
+                                <th>Operations</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-tbody">
+                            <tr>
+                                <td colspan="5" class="table-state-cell">Loading cleaning history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

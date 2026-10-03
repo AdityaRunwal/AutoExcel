@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables / secrets
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+~$*.csv
+
+# AutoExcel generated files
+backend/data/
+backend/storage/
+data/outputs/
+data/uploads/
+
+# Generated cleaned files
+cleaned_*.xlsx
+cleaned_*.xls
+cleaned_*.csv
+
+# OS files
+.DS_Store
+Thumbs.db
