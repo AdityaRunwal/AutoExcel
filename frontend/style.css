@@ -598,3 +598,58 @@ textarea:disabled {
     font-weight: 600;
     background: rgba(46, 204, 113, 0.12);
 }
+
+/* Example Chips */
+.example-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    margin-bottom: 12px;
+}
+
+.chip {
+    background-color: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.chip:hover {
+    background-color: #e0e7ff;
+}
+
+.chip:active {
+    background-color: #c7d2fe;
+}
+
+/* Supported Operations Reference */
+.operations-reference {
+    margin-top: 8px;
+    font-size: 14px;
+}
+
+.operations-reference summary {
+    cursor: pointer;
+    color: #4f46e5;
+    font-weight: 500;
+    padding: 6px 0;
+}
+
+.operations-reference summary:hover {
+    text-decoration: underline;
+}
+
+.operations-reference ul {
+    margin-top: 8px;
+    padding-left: 20px;
+    line-height: 1.6;
+}
+
+.operations-reference li {
+    margin-bottom: 6px;
+}

@@ -59,6 +59,59 @@
                             required></textarea>
                     </div>
 
+                    <!-- Supported Operations Reference -->
+                    <div class="form-group">
+                        <p class="form-label">What can AutoExcel do? Click an example to try it:</p>
+
+                        <div class="example-chips" id="example-chips">
+                            <button type="button" class="chip" data-text="Remove duplicate rows">Remove
+                                Duplicates</button>
+                            <button type="button" class="chip" data-text="Remove extra spaces">Remove Extra
+                                Spaces</button>
+                            <button type="button" class="chip" data-text="Fill missing values with mean">Fill Missing
+                                (Mean)</button>
+                            <button type="button" class="chip" data-text="Fill missing values with median">Fill Missing
+                                (Median)</button>
+                            <button type="button" class="chip" data-text="Standardize text to lowercase">Standardize
+                                Text</button>
+                            <button type="button" class="chip" data-text="Remove duplicate columns">Remove Duplicate
+                                Columns</button>
+                            <button type="button" class="chip" data-text="Create summary sheet">Create Summary
+                                Sheet</button>
+                        </div>
+
+                        <details class="operations-reference">
+                            <summary>See all supported operations</summary>
+                            <ul>
+                                <li><strong>Remove duplicate rows</strong> — e.g. "remove duplicates"</li>
+                                <li><strong>Fill missing values</strong> — with mean, median, or mode, e.g. "fill
+                                    missing values with mean"</li>
+                                <li><strong>Remove extra spaces</strong> — e.g. "remove extra spaces"</li>
+                                <li><strong>Standardize text</strong> — lowercase, uppercase, or title case, e.g.
+                                    "standardize text to uppercase"</li>
+                                <li><strong>Remove empty rows or columns</strong> — e.g. "remove empty rows"</li>
+                                <li><strong>Standardize column names</strong> — e.g. "standardize column names"</li>
+                                <li><strong>Remove negative values</strong> — or replace them with mean, e.g. "replace
+                                    negative values with mean"</li>
+                                <li><strong>Remove duplicate columns</strong> — e.g. "remove duplicate columns"</li>
+                                <li><strong>Convert columns</strong> — to numeric, text, or date, e.g. "convert columns
+                                    to numeric"</li>
+                                <li><strong>Standardize dates</strong> — e.g. "standardize dates"</li>
+                                <li><strong>Filter rows</strong> — uses your own column name, e.g. "remove rows where
+                                    Age is less than 18"</li>
+                                <li><strong>Sort data</strong> — uses your own column name, e.g. "sort by Salary
+                                    descending"</li>
+                                <li><strong>Rename columns</strong> — uses your own column names, e.g. "rename Cust_Name
+                                    to Customer Name"</li>
+                                <li><strong>Create a calculated column</strong> — uses your own column names, e.g.
+                                    "create a column Total as Price times Quantity"</li>
+                                <li><strong>Group and summarize</strong> — uses your own column names, e.g. "group by
+                                    City and sum Score"</li>
+                                <li><strong>Create a summary sheet</strong> — e.g. "create summary sheet"</li>
+                            </ul>
+                        </details>
+                    </div>
+
                     <!-- Submit Button -->
                     <div class="form-group">
                         <button type="submit" id="submit-btn" class="btn btn-primary" disabled>
@@ -66,6 +119,7 @@
                             <span class="btn-text">Clean Dataset</span>
                         </button>
                     </div>
+                </form>
                 </form>
 
                 <!-- Status Messages -->
@@ -78,9 +132,9 @@
                             <p class="result-title">Your file has been cleaned successfully</p>
                             <p id="download-filename" class="result-filename">cleaned_file.xlsx</p>
                         </div>
-                            <a id="download-btn" class="btn btn-primary" download>
-                                Download Cleaned File
-                            </a>    
+                        <a id="download-btn" class="btn btn-primary" download>
+                            Download Cleaned File
+                        </a>
                     </div>
                 </div>
             </section>
@@ -103,7 +157,7 @@
                 </div>
             </section>
 
-                        <!-- Dataset Information -->
+            <!-- Dataset Information -->
             <section id="dataset-container" class="card hidden">
 
                 <div class="card-title-group">

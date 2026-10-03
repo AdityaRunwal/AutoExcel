@@ -236,6 +236,16 @@ function setupEventListeners() {
     refreshHistoryBtn.addEventListener('click', fetchHistory);
 }
 
+// Example Chip Buttons — clicking one inserts its text into the prompt box
+document.querySelectorAll('#example-chips .chip').forEach(button => {
+    button.addEventListener('click', () => {
+        const text = button.getAttribute('data-text');
+        promptInput.value = text;
+        updateSubmitButtonState();
+        promptInput.focus();
+    });
+});
+
 // Update Submit Button State (Disabled unless file is selected AND prompt is not empty)
 function updateSubmitButtonState() {
     const isFileSelected = !!selectedFile;
@@ -543,10 +553,8 @@ function renderSummary(data) {
 
 // Fetch Cleaning History
 async function fetchHistory() {
-    console.log('fetchHistory called');
     try {
         const response = await fetch(`${API_BASE_URL}/history`);
-        console.log('fetchHistory response status:', response.status);
         if (!response.ok) {
             throw new Error(`Failed to fetch history: ${response.statusText}`);
         }
