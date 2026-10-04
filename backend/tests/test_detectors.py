@@ -194,3 +194,29 @@ def test_summary_sheet_synonym():
 
 def test_summary_sheet_false():
     assert detect_summary_sheet("remove duplicates") is False
+
+# ---------- Phase 10: expanded synonym coverage ----------
+
+def test_detect_remove_empty_rows_synonym():
+    ops = detect_operations("drop empty rows")
+    assert "remove_empty_rows" in ops
+
+def test_detect_remove_empty_columns_synonym():
+    ops = detect_operations("get rid of empty columns")
+    assert "remove_empty_columns" in ops
+
+def test_detect_standardize_columns_synonym():
+    ops = detect_operations("fix the column names")
+    assert "standardize_columns" in ops
+
+def test_detect_convert_numeric_synonym():
+    ops = detect_operations("turn columns into numbers")
+    assert "convert_numeric" in ops
+
+def test_detect_remove_duplicate_columns_synonym():
+    ops = detect_operations("drop duplicate columns")
+    assert "remove_duplicate_columns" in ops
+
+def test_detect_standardize_dates_synonym():
+    ops = detect_operations("fix the dates")
+    assert "standardize_dates" in ops

@@ -127,7 +127,11 @@ def detect_operations(prompt: str):
         "remove empty rows",
         "delete empty rows",
         "remove blank rows",
-        "delete blank rows"
+        "delete blank rows",
+        "drop empty rows",
+        "drop blank rows",
+        "get rid of empty rows",
+        "clear empty rows"
     ]):
         operations.append("remove_empty_rows")
 
@@ -138,7 +142,11 @@ def detect_operations(prompt: str):
         "remove empty columns",
         "delete empty columns",
         "remove blank columns",
-        "delete blank columns"
+        "delete blank columns",
+        "drop empty columns",
+        "drop blank columns",
+        "get rid of empty columns",
+        "clear empty columns"
     ]):
         operations.append("remove_empty_columns")
 
@@ -148,7 +156,12 @@ def detect_operations(prompt: str):
         "standardize column names",
         "clean column names",
         "normalize column names",
-        "format column names"
+        "format column names",
+        "fix column names",
+        "fix the column names",
+        "tidy column names",
+        "tidy up column names",
+        "consistent column names"
     ]):
         operations.append("standardize_columns")
 
@@ -215,7 +228,10 @@ def detect_operations(prompt: str):
         "make columns numeric",
         "make the columns numeric",
         "change columns to numeric",
-        "change the columns to numeric"
+        "change the columns to numeric",
+        "turn columns into numbers",
+        "numeric conversion",
+        "fix number formatting"
     ]):
         operations.append("convert_numeric")
 
@@ -254,7 +270,11 @@ def detect_operations(prompt: str):
         "format dates",
         "format date columns",
         "normalize dates",
-        "consistent date format"
+        "consistent date format",
+        "fix date format",
+        "fix the dates",
+        "clean up dates",
+        "unify date format"
     ]):
         operations.append("standardize_dates")
 
@@ -264,7 +284,11 @@ def detect_operations(prompt: str):
         "duplicated columns",
         "repeated columns",
         "remove duplicate columns",
-        "delete duplicate columns"
+        "delete duplicate columns",
+        "drop duplicate columns",
+        "get rid of duplicate columns",
+        "remove repeated columns",
+        "delete repeated columns"
     ]):
         operations.append("remove_duplicate_columns")
 
