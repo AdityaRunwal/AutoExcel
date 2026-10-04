@@ -220,3 +220,56 @@ def test_detect_remove_duplicate_columns_synonym():
 def test_detect_standardize_dates_synonym():
     ops = detect_operations("fix the dates")
     assert "standardize_dates" in ops
+
+from app.routes.ai_clean import detect_remove_column
+
+# ---------- Phase 11: detect_remove_column ----------
+
+def test_remove_column_basic():
+    result = detect_remove_column("remove the column Notes")
+    assert result is not None
+    assert result["column_raw"] == "notes"
+
+def test_remove_column_delete_variant():
+    result = detect_remove_column("delete column Email")
+    assert result is not None
+    assert result["column_raw"] == "email"
+
+def test_remove_column_no_match():
+    result = detect_remove_column("remove duplicates")
+    assert result is None
+
+from app.routes.ai_clean import detect_split_column
+
+# ---------- Phase 11: detect_split_column ----------
+
+def test_split_column_basic():
+    result = detect_split_column("split Full Name into First Name and Last Name")
+    assert result is not None
+    assert result["column_raw"] == "full name"
+    assert result["new_col_1"] == "first name"
+    assert result["new_col_2"] == "last name"
+
+def test_split_column_no_match():
+    result = detect_split_column("remove duplicates")
+    assert result is None
+
+from app.routes.ai_clean import detect_merge_columns
+
+# ---------- Phase 11: detect_merge_columns ----------
+
+def test_merge_columns_basic():
+    result = detect_merge_columns("merge First Name and Last Name into Full Name")
+    assert result is not None
+    assert result["col_1_raw"] == "first name"
+    assert result["col_2_raw"] == "last name"
+    assert result["new_col"] == "full name"
+
+def test_merge_columns_combine_variant():
+    result = detect_merge_columns("combine City and State into Location")
+    assert result is not None
+    assert result["new_col"] == "location"
+
+def test_merge_columns_no_match():
+    result = detect_merge_columns("remove duplicates")
+    assert result is None

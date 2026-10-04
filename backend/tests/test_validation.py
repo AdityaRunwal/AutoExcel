@@ -121,3 +121,53 @@ def test_validate_result_includes_skipped_steps_as_warnings():
     )
     assert result["status"] == "warning"
     assert any("rename_columns" in w for w in result["warnings"])
+
+# ---------- Phase 11: validate_plan with remove_column ----------
+
+def test_validate_plan_remove_column_valid():
+    df = make_sample_df()
+    plan = {
+        "steps": [
+            {"operation": "remove_column", "params": {"column_raw": "age"}}
+        ]
+    }
+    result = validate_plan(df, plan)
+    assert len(result["steps"]) == 1
+    assert result["skipped_steps"] == []
+
+def test_validate_plan_remove_column_invalid():
+    df = make_sample_df()
+    plan = {
+        "steps": [
+            {"operation": "remove_column", "params": {"column_raw": "FakeColumn"}}
+        ]
+    }
+    result = validate_plan(df, plan)
+    assert len(result["steps"]) == 0
+    assert len(result["skipped_steps"]) == 1
+
+# ---------- Phase 11: validate_plan with split_column ----------
+
+def test_validate_plan_split_column_invalid():
+    df = make_sample_df()
+    plan = {
+        "steps": [
+            {"operation": "split_column", "params": {"column_raw": "FakeColumn", "new_col_1": "A", "new_col_2": "B"}}
+        ]
+    }
+    result = validate_plan(df, plan)
+    assert len(result["steps"]) == 0
+    assert len(result["skipped_steps"]) == 1
+
+# ---------- Phase 11: validate_plan with merge_columns ----------
+
+def test_validate_plan_merge_columns_invalid():
+    df = make_sample_df()
+    plan = {
+        "steps": [
+            {"operation": "merge_columns", "params": {"col_1_raw": "FakeCol", "col_2_raw": "Age", "new_col": "Combined"}}
+        ]
+    }
+    result = validate_plan(df, plan)
+    assert len(result["steps"]) == 0
+    assert len(result["skipped_steps"]) == 1

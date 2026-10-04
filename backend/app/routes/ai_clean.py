@@ -456,6 +456,73 @@ def detect_calculated_column(prompt):
         "expr_raw": expr_raw
     }
 
+def apply_merge_columns(df, merge_columns_condition):
+    if not merge_columns_condition:
+        return df
+
+    col_1_raw = merge_columns_condition.get("col_1_raw", "")
+    col_2_raw = merge_columns_condition.get("col_2_raw", "")
+    new_col = merge_columns_condition.get("new_col", "")
+
+    actual_col_1 = None
+    actual_col_2 = None
+
+    for col in df.columns:
+        if col.strip().lower() == col_1_raw.strip().lower():
+            actual_col_1 = col
+        if col.strip().lower() == col_2_raw.strip().lower():
+            actual_col_2 = col
+
+    if actual_col_1 is None or actual_col_2 is None:
+        return df
+
+    df[new_col] = df[actual_col_1].astype(str) + " " + df[actual_col_2].astype(str)
+
+    return df
+
+def apply_split_column(df, split_column_condition):
+    if not split_column_condition:
+        return df
+
+    column_raw = split_column_condition.get("column_raw", "")
+    new_col_1 = split_column_condition.get("new_col_1", "")
+    new_col_2 = split_column_condition.get("new_col_2", "")
+
+    actual_column = None
+    for col in df.columns:
+        if col.strip().lower() == column_raw.strip().lower():
+            actual_column = col
+            break
+
+    if actual_column is None:
+        return df
+
+    split_values = df[actual_column].astype(str).str.split(n=1, expand=True)
+
+    if split_values.shape[1] < 2:
+        split_values[1] = ""
+
+    df[new_col_1] = split_values[0]
+    df[new_col_2] = split_values[1]
+
+    return df
+
+def apply_remove_column(df, remove_column_condition):
+    if not remove_column_condition:
+        return df
+
+    column_raw = remove_column_condition.get("column_raw", "")
+    actual_column = None
+
+    for col in df.columns:
+        if col.strip().lower() == column_raw.strip().lower():
+            actual_column = col
+            break
+
+    if actual_column is not None:
+        df = df.drop(columns=[actual_column])
+
+    return df
 
 def apply_calculated_column(df, calc_column):
     if not calc_column:
@@ -530,6 +597,71 @@ def detect_group_condition(prompt):
         "group_column_raw": group_column_raw,
         "agg_function": agg_map.get(agg_raw),
         "agg_column_raw": agg_column_raw
+    }
+
+def detect_split_column(prompt):
+    prompt_lower = prompt.lower()
+
+    if "split" not in prompt_lower:
+        return None
+
+    match = re.search(
+        r"split\s+([a-zA-Z0-9_ ]+?)\s+into\s+([a-zA-Z0-9_ ]+?)\s+and\s+([a-zA-Z0-9_ ]+?)$",
+        prompt_lower
+    )
+
+    if not match:
+        return None
+
+    column_raw = match.group(1).strip()
+    new_col_1 = match.group(2).strip()
+    new_col_2 = match.group(3).strip()
+
+    return {
+        "column_raw": column_raw,
+        "new_col_1": new_col_1,
+        "new_col_2": new_col_2
+    }
+
+def detect_remove_column(prompt):
+    prompt_lower = prompt.lower()
+
+    match = re.search(
+        r"(?:remove|delete|drop)\s+(?:the\s+)?column\s+([a-zA-Z0-9_ ]+?)(?:\s+column)?$",
+        prompt_lower
+    )
+
+    if not match:
+        return None
+
+    column_raw = match.group(1).strip()
+
+    return {
+        "column_raw": column_raw
+    }
+
+def detect_merge_columns(prompt):
+    prompt_lower = prompt.lower()
+
+    if "merge" not in prompt_lower and "combine" not in prompt_lower:
+        return None
+
+    match = re.search(
+        r"(?:merge|combine)\s+([a-zA-Z0-9_ ]+?)\s+and\s+([a-zA-Z0-9_ ]+?)\s+into\s+([a-zA-Z0-9_ ]+?)$",
+        prompt_lower
+    )
+
+    if not match:
+        return None
+
+    col_1_raw = match.group(1).strip()
+    col_2_raw = match.group(2).strip()
+    new_col = match.group(3).strip()
+
+    return {
+        "col_1_raw": col_1_raw,
+        "col_2_raw": col_2_raw,
+        "new_col": new_col
     }
 
 def detect_summary_sheet(prompt):
@@ -614,6 +746,9 @@ def build_cleaning_plan(prompt):
             "calc_column": None,
             "group_condition": None,
             "create_summary": False,
+            "remove_column_condition": None,
+            "split_column_condition": None,
+            "merge_columns_condition": None,
             "clarification_needed": True,
             "message": "Please enter cleaning instructions before generating a plan."
         }
@@ -625,6 +760,9 @@ def build_cleaning_plan(prompt):
     calc_column = detect_calculated_column(prompt)
     group_condition = detect_group_condition(prompt)
     create_summary = detect_summary_sheet(prompt)
+    remove_column_condition = detect_remove_column(prompt)
+    split_column_condition = detect_split_column(prompt)
+    merge_columns_condition = detect_merge_columns(prompt)
 
     plan_steps = []
 
@@ -649,19 +787,28 @@ def build_cleaning_plan(prompt):
     if create_summary:
         plan_steps.append({"operation": "create_summary_sheet", "params": {}})
 
-    if not plan_steps:
-        return {
-            "steps": plan_steps,
-            "operations": operations,
-            "filter_condition": filter_condition,
-            "sort_condition": sort_condition,
-            "rename_conditions": rename_conditions,
-            "calc_column": calc_column,
-            "group_condition": group_condition,
-            "create_summary": create_summary,
-            "clarification_needed": True,
-            "message": "I couldn't understand any specific cleaning operation in that prompt. Try being more specific, e.g. 'remove duplicates', 'fill missing values with mean', or 'sort by Salary descending'."
-        }
+    if remove_column_condition:
+        plan_steps.append({"operation": "remove_column", "params": remove_column_condition})
+
+    if split_column_condition:
+        plan_steps.append({"operation": "split_column", "params": split_column_condition})
+
+    if merge_columns_condition:
+        plan_steps.append({"operation": "merge_columns", "params": merge_columns_condition})
+
+    return {
+        "steps": plan_steps,
+        "operations": operations,
+        "filter_condition": filter_condition,
+        "sort_condition": sort_condition,
+        "rename_conditions": rename_conditions,
+        "calc_column": calc_column,
+        "group_condition": group_condition,
+        "create_summary": create_summary,
+        "remove_column_condition": remove_column_condition,
+        "split_column_condition": split_column_condition,
+        "merge_columns_condition": merge_columns_condition
+    }
 
     return {
         "steps": plan_steps,
@@ -709,6 +856,44 @@ def validate_plan(df, plan):
                 reason = "None of the specified columns to rename were found"
             else:
                 params["renames"] = valid_renames
+
+        elif operation == "group_summarize":
+            group_col = params.get("group_column_raw", "")
+            agg_col = params.get("agg_column_raw", "")
+            if not column_exists(group_col) or not column_exists(agg_col):
+                is_valid = False
+                reason = f"Column '{group_col}' or '{agg_col}' not found"
+
+        elif operation == "remove_column":
+            col = params.get("column_raw", "")
+            if not column_exists(col):
+                is_valid = False
+                reason = f"Column '{col}' not found"
+
+        elif operation == "split_column":
+            col = params.get("column_raw", "")
+            if not column_exists(col):
+                is_valid = False
+                reason = f"Column '{col}' not found"
+
+        elif operation == "merge_columns":
+            col1 = params.get("col_1_raw", "")
+            col2 = params.get("col_2_raw", "")
+            if not column_exists(col1) or not column_exists(col2):
+                is_valid = False
+                reason = f"Column '{col1}' or '{col2}' not found"
+
+        elif operation == "split_column":
+            col = params.get("column_raw", "")
+            if not column_exists(col):
+                is_valid = False
+                reason = f"Column '{col}' not found"
+
+        elif operation == "remove_column":
+            col = params.get("column_raw", "")
+            if not column_exists(col):
+                is_valid = False
+                reason = f"Column '{col}' not found"
 
         elif operation == "group_summarize":
             group_col = params.get("group_column_raw", "")
@@ -1115,6 +1300,9 @@ async def ai_clean_excel(
     calc_column = plan["calc_column"] if "create_calculated_column" in valid_op_names else None
     group_condition = plan["group_condition"] if "group_summarize" in valid_op_names else None
     create_summary = plan["create_summary"] if "create_summary_sheet" in valid_op_names else False
+    remove_column_condition = plan["remove_column_condition"] if "remove_column" in valid_op_names else None
+    split_column_condition = plan["split_column_condition"] if "split_column" in valid_op_names else None
+    merge_columns_condition = plan["merge_columns_condition"] if "merge_columns" in valid_op_names else None
 
     operations = valid_op_names
 
@@ -1136,6 +1324,15 @@ async def ai_clean_excel(
 
     if calc_column:
         df = apply_calculated_column(df, calc_column)
+
+    if remove_column_condition:
+        df = apply_remove_column(df, remove_column_condition)
+
+    if split_column_condition:
+        df = apply_split_column(df, split_column_condition)
+
+    if merge_columns_condition:
+        df = apply_merge_columns(df, merge_columns_condition)
 
     summary_df = None
     if create_summary:
