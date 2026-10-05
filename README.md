@@ -644,39 +644,27 @@ This workflow reflects how I currently use AI tools: **as development accelerato
 
 # 📸 Screenshots
 
-Add screenshots of the actual application here.
-
-Recommended screenshots:
+Screenshots of the AutoExcel application and its main features.
 
 ### 1. Upload Interface
 
-```text
-[ Add Screenshot Here ]
-```
+![Upload Interface](screenshots/01-upload.png)
 
 ### 2. Cleaning Plan Review
 
-```text
-[ Add Screenshot Here ]
-```
+![Cleaning Plan Review](screenshots/02-plan-review.png)
 
 ### 3. Before / After Summary
 
-```text
-[ Add Screenshot Here ]
-```
+![Before / After Summary](screenshots/03-summary.png)
 
 ### 4. Cleaning History
 
-```text
-[ Add Screenshot Here ]
-```
+![Cleaning History](screenshots/04-history.png)
 
 ### 5. Generated Excel / CSV Output
 
-```text
-[ Add Screenshot Here ]
-```
+![Generated Excel / CSV Output](screenshots/05-excel-output.png)
 
 ---
 

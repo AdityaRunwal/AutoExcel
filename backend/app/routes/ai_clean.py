@@ -1,3 +1,4 @@
+from starlette import staticfiles
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 import pandas as pd
@@ -700,7 +701,7 @@ def _style_worksheet(worksheet, df):
     from openpyxl.styles import Font, PatternFill
 
     header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_fill = PatternFill(start_color="047857", end_color="047857", fill_type="solid")
 
     for cell in worksheet[1]:
         cell.font = header_font
@@ -1407,12 +1408,14 @@ async def ai_clean_excel(
     )
 
     if extension == ".csv" and summary_df is None:
-        df.to_csv(output_file, index=False)
+        output_file = output_file.rsplit(".", 1)[0] + ".xlsx"
+
+        write_excel_output(output_file, df)
 
         return FileResponse(
             path=output_file,
-            media_type="text/csv",
-            filename="cleaned_" + file.filename
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename="cleaned_" + file.filename.rsplit(".", 1)[0] + ".xlsx"
         )
     else:
         # CSV files that requested a summary sheet are upgraded to .xlsx,
