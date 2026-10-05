@@ -162,8 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Event Listeners Setup
 function setupEventListeners() {
     // Dropzone Click
-    dropzone.addEventListener('click', () => {
-        if (!selectedFile && !submitBtn.disabled && spinner.classList.contains('hidden')) {
+    dropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#remove-file-btn')) {
+            return;
+        }
+        if (!selectedFile && spinner.classList.contains('hidden')) {
             fileInput.click();
         }
     });
