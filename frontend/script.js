@@ -593,7 +593,9 @@ function renderHistoryTable(history) {
     const sorted = [...history].reverse();
 
     historyTbody.innerHTML = sorted.map(item => {
-        const dateStr = item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A';
+        const dateStr = item.created_at
+            ? new Date(item.created_at + 'Z').toLocaleString()
+            : 'N/A';
         const operationsStr = item.operations || 'None';
 
         const formattedOperations = operationsStr !== 'None'
