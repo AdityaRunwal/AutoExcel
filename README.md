@@ -642,6 +642,14 @@ This workflow reflects how I currently use AI tools: **as development accelerato
 
 ---
 
+# 🔗 Live Demo
+
+**Try it here:** [https://autoexcel-aditya.netlify.app/](https://autoexcel-aditya.netlify.app/)
+
+*Note: the backend runs on a free hosting tier that sleeps after inactivity. The first request after idle time may take 30-50 seconds to wake up — subsequent requests are fast.*
+
+---
+
 # 📸 Screenshots
 
 Screenshots of the AutoExcel application and its main features.
